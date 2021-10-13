@@ -1,0 +1,106 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-ec.jakiro.core
+  namespace: middleware
+data:
+  env: TEST
+  MetaspaceSize: 128m
+  MaxMetaspaceSize: 256m
+  Xmn: 256m
+  Xms: 1024m
+  Xmx: 2048m
+  Xss: 256k
+  serverName: ec.jakiro.core
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ec-jakiro-core
+  namespace: middleware
+spec:
+  selector:
+    matchLabels:
+      app: ec.jakiro.core
+  replicas: 1
+  #设置滚动升级策略
+  #Kubernetes在等待设置的时间后才开始进行升级，例如5秒
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      #升级过程中最多可以比原先设置多出的Pod数量
+      maxSurge: 1
+      #升级过程中Deployment控制器最多可以删除多少个旧Pod，主要用于提供缓冲时间
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: ec.jakiro.core
+    spec:
+      #构建初始化镜像(通过初始化镜像的方式集成SkyWalking Agent)
+      initContainers:
+        - image: harbor.xwsoftlan.com/xwopt/apache-skywalking-agent-sidecar@sha256:6007fc61ad7d137613668a8b17db21fb9887c3a07af153a7f7bea60b080c1193
+          name: sw-agent-sidecar
+          imagePullPolicy: IfNotPresent
+          command: ["sh"]
+          args:
+            [
+              "-c",
+              "mkdir -p /skywalking/ && cp -r /usr/skywalking/* /skywalking/",
+            ]
+          volumeMounts:
+            - mountPath: /skywalking/
+              name: sw-agent
+      containers:
+        - name: ec-jakiro-core
+          image: harbor.xwsoftlan.com/library/ec.jakiro.core@sha256:4d3940d5409a84241a2bdc92d59acc7f8b3bf6c2b134afbbebf5b4624fb6e5b7
+          envFrom:
+          - configMapRef:
+              name: cm-ec.jakiro.core
+#          env:
+            #这里通过JAVA_TOOL_OPTIONS，而不是JAVA_OPTS可以实现不通过将agent命令加入到java应用jvm参数而实现agent的集成
+#            - name: JAVA_TOOL_OPTIONS
+#              value: -javaagent:/usr/skywalking/agent/skywalking-agent.jar
+#            - name: SW_AGENT_NAME
+#              value: ec.jakiro.core
+#            - name: SW_AGENT_COLLECTOR_BACKEND_SERVICES
+#              # FQDN: servicename.namespacename.svc.cluster.local
+#              value: skywalking-oap.middleware:11800
+#            - name: SERVER_PORT
+#              value: "8080"
+#            - name: SPRING_PROFILES_ACTIVE
+#              value: test
+          volumeMounts:
+            - name: localtime
+              mountPath: /etc/localtime
+            - name: sw-agent
+              mountPath: /usr/skywalking
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim: 
+            claimName: pvc-data-ec.jakiro.core
+        - name: localtime
+          hostPath:
+            path: /usr/share/zoneinfo/Asia/Shanghai
+        - name: sw-agent
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ec-jakiro-core
+  namespace: middleware
+  labels:
+    svc: ec.jakiro.core
+spec:
+  selector:
+    app: ec.jakiro.core
+  ports:
+    - name: http
+      port: 8080
+      # nodePort: 30001
+  type: NodePort

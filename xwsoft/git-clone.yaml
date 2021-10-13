@@ -1,0 +1,126 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: cat-branch-readme
+spec:
+  description: |
+    cat-branch-readme takes a git repository and a branch name and
+    prints the README.md file from that branch. This is an example
+    Pipeline demonstrating the following:
+      - Using the git-clone catalog Task to clone a branch
+      - Passing a cloned repo to subsequent Tasks using a Workspace.
+      - Ordering Tasks in a Pipeline using "runAfter" so that
+        git-clone completes before we try to read from the Workspace.
+      - Using a volumeClaimTemplate Volume as a Workspace.
+      - Avoiding hard-coded paths by using a Workspace's path
+        variable instead.
+  params:
+  - name: repo-url
+    type: string
+    description: The git repository URL to clone from.
+  - name: branch-name
+    type: string
+    description: The git branch to clone.
+  - name: image
+    type: string
+    description: image tag.
+  workspaces:
+  - name: dockerconfig
+  - name: ssh-creds
+  - name: shared-data
+    description: |
+      This workspace will receive the cloned git repo and be passed
+      to the next Task for the repo's README.md file to be read.
+  tasks:
+#  - name: env
+#    workspaces:
+#    - name: source
+#      workspace: shared-data
+#    taskSpec:
+#      workspaces:
+#      - name: source
+#      steps:
+#      - image: zshusers/zsh:4.3.15
+#        script: |
+#          #!/usr/bin/env zsh
+#          env
+#          pwd
+#          ssh -vT git@github.com
+#          git config --global user.name "Zhangyunpeng"
+#          git config --global user.email "zhangyunpeng@xwsoft.com.cn"
+#          #echo "192.168.100.170 harbor.xwsoftlan.com" >> /etc/hosts
+#          #echo "192.168.100.137 gitlab.xwsoftlan.com" >> /etc/hosts
+#          echo "+ cat /etc/hosts" && cat /etc/hosts
+#          echo "+ ls -la /tekton/creds\n" && ls -la /tekton/creds
+#          echo "+ ls -la /tekton/creds-secrets\n" && ls -la /tekton/creds-secrets
+#          echo "+ ls -la /tekton/home\n" && ls -la /tekton/home
+#          echo "+ ls -la /root/.ssh\n" && ls -la /root/.ssh
+#          echo "+ cat/root/.ssh/config\n" && cat /root/.ssh/config
+#          echo "+ cat/root/.ssh/*\n" && cat /root/.ssh/*
+  - name: fetch-repo
+#    runAfter: ["env"]
+    taskRef:
+      name: git-clone
+    workspaces:
+    - name: ssh-directory
+      workspace: ssh-creds
+    - name: output
+      workspace: shared-data
+    params:
+    - name: url
+      value: $(params.repo-url)
+    - name: revision
+      value: $(params.branch-name)
+#  - name: cat-readme
+#    runAfter: ["fetch-repo"]  
+#    workspaces:
+#    - name: source
+#      workspace: shared-data
+#    taskRef:
+#      name: cat-dockerfile
+  - name: build-and-push
+    runAfter: ["fetch-repo"]
+    taskRef:
+      name: kaniko
+    workspaces:
+    - name: source
+      workspace: shared-data
+    - name: dockerconfig
+      workspace: dockerconfig
+    params:
+    - name: IMAGE
+      value: $(params.image)
+---
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: git-clone-checking-out-a-branch
+spec:
+  serviceAccountName: xwsoftlan-ssh-key-build-bot
+  pipelineRef:
+    name: cat-branch-readme
+  workspaces:
+  - name: ssh-creds
+    secret:
+      secretName: xwsoftlan-ssh-key
+  - name: dockerconfig
+    secret:
+      secretName: harbor-secret
+  - name: shared-data
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteMany
+        storageClassName: rook-cephfs
+        resources:
+          requests:
+            storage: 1Gi
+  params:
+  - name: repo-url
+    #value: ssh://git@gitlab.xwsoftlan.com:31022/Zhangyunpeng/test.git
+    value: ssh://git@gitlab.xwsoftlan.com:31022/xwsoft-opts/gvno-data-go-dashboard.git
+    #value: git@github.com:Plusirin/gvno-data-go.git
+  - name: branch-name
+    value: master
+  - name: image
+    value: harbor.xwsoftlan.com/xwopt/gvno-data-go-dashboard:v0.0.1

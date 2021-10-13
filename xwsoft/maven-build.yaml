@@ -1,0 +1,117 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: pipeline-maven-build-and-push-with-kaniko
+spec:
+  description: |
+    cat-branch-readme takes a git repository and a branch name and
+    prints the README.md file from that branch. This is an example
+    Pipeline demonstrating the following:
+      - Using the git-clone catalog Task to clone a branch
+      - Passing a cloned repo to subsequent Tasks using a Workspace.
+      - Ordering Tasks in a Pipeline using "runAfter" so that
+        git-clone completes before we try to read from the Workspace.
+      - Using a volumeClaimTemplate Volume as a Workspace.
+      - Avoiding hard-coded paths by using a Workspace's path
+        variable instead.
+  params:
+  - name: repo-url
+    type: string
+    description: The git repository URL to clone from.
+  - name: branch-name
+    type: string
+    description: The git branch to clone.
+  - name: image
+    type: string
+    description: image tag.
+  workspaces:
+  - name: maven-settings
+  - name: dockerconfig
+  - name: ssh-creds
+  - name: shared-data
+    description: |
+      This workspace will receive the cloned git repo and be passed
+      to the next Task for the repo's README.md file to be read.
+  tasks:
+  - name: git-fetch-repo
+    taskRef:
+      name: git-clone
+    workspaces:
+    - name: ssh-directory
+      workspace: ssh-creds
+    - name: output
+      workspace: shared-data
+    params:
+    - name: url
+      value: $(params.repo-url)
+    - name: revision
+      value: $(params.branch-name)
+  - name: maven-package
+    runAfter: ["git-fetch-repo"]
+    taskRef:
+      name: maven
+    workspaces:
+    - name: source
+      workspace: shared-data
+    - name: maven-settings
+      workspace: maven-settings
+    params:
+    - name: CONTEXT_DIR
+      value: "."
+    - name: GOALS
+      value:
+      - -DskipTests
+      - clean
+      - package
+  - name: build-and-push
+    runAfter: 
+      - git-fetch-repo
+      - maven-package
+    taskRef:
+      name: kaniko
+    workspaces:
+    - name: source
+      workspace: shared-data
+    - name: dockerconfig
+      workspace: dockerconfig
+    params:
+    - name: IMAGE
+      value: $(params.image)
+---
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: pipeline-maven-build-and-push-with-kaniko-run
+spec:
+  serviceAccountName: xwsoftlan-ssh-key-build-bot
+  pipelineRef:
+    name: pipeline-maven-build-and-push-with-kaniko
+  workspaces:
+  - name: ssh-creds
+    secret:
+      secretName: xwsoftlan-ssh-key
+  - name: dockerconfig
+    secret:
+      secretName: harbor-secret
+  - name: shared-data
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteMany
+        storageClassName: rook-cephfs
+        resources:
+          requests:
+            storage: 1Gi
+  - name: maven-settings
+    configMap:
+      name: custom-maven-settings
+  params:
+  - name: repo-url
+    value: ssh://git@gitlab.xwsoftlan.com:31022/ctg/ec.jakiro.core.git
+    #value: ssh://git@gitlab.xwsoftlan.com:31022/Zhangyunpeng/test.git
+    #value: ssh://git@gitlab.xwsoftlan.com:31022/xwsoft-opts/gvno-data-go-dashboard.git
+    #value: git@github.com:Plusirin/gvno-data-go.git
+  - name: branch-name
+    value: master
+  - name: image
+    value: harbor.xwsoftlan.com/library/ec.jakiro.core:v0.0.1
