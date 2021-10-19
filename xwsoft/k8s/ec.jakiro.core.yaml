@@ -3,9 +3,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: cm-ec.jakiro.core
-  namespace: middleware
+  namespace: ctexcelhk
 data:
-  env: TEST
   MetaspaceSize: 128m
   MaxMetaspaceSize: 256m
   Xmn: 256m
@@ -13,12 +12,13 @@ data:
   Xmx: 2048m
   Xss: 256k
   serverName: ec.jakiro.core
+  APOLLO_META: http://apollo-service-test-apollo-configservice.ctexcelhk:8080
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ec-jakiro-core
-  namespace: middleware
+  namespace: ctexcelhk
 spec:
   selector:
     matchLabels:
@@ -41,7 +41,8 @@ spec:
     spec:
       #构建初始化镜像(通过初始化镜像的方式集成SkyWalking Agent)
       initContainers:
-        - image: harbor.xwsoftlan.com/xwopt/apache-skywalking-agent-sidecar@sha256:6007fc61ad7d137613668a8b17db21fb9887c3a07af153a7f7bea60b080c1193
+        - image: core.harbor.xwsoft.cn:30267/library/apache-skywalking-agent-sidecar:v8.7.0-owner
+          imagePullPolicy: Always
           name: sw-agent-sidecar
           imagePullPolicy: IfNotPresent
           command: ["sh"]
@@ -55,7 +56,8 @@ spec:
               name: sw-agent
       containers:
         - name: ec-jakiro-core
-          image: harbor.xwsoftlan.com/library/ec.jakiro.core@sha256:4d3940d5409a84241a2bdc92d59acc7f8b3bf6c2b134afbbebf5b4624fb6e5b7
+          image: core.harbor.xwsoft.cn:30267/library/ec.jakiro.core:v0.0.1
+          imagePullPolicy: Always
           envFrom:
           - configMapRef:
               name: cm-ec.jakiro.core
@@ -93,7 +95,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ec-jakiro-core
-  namespace: middleware
+  namespace: ctexcelhk
   labels:
     svc: ec.jakiro.core
 spec:

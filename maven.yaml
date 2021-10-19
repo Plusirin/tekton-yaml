@@ -24,8 +24,8 @@ spec:
     - name: MAVEN_IMAGE
       type: string
       description: Maven base image
-      default: harbor.xwsoftlan.com/xwopt/maven:3.6.1-jdk-8-alpine
-      #default: gcr.io/cloud-builders/mvn@sha256:57523fc43394d6d9d2414ee8d1c85ed7a13460cbb268c3cd16d28cfb3859e641 #tag: latest
+      #default: harbor.xwsoftlan.com/xwopt/maven:3.6.1-jdk-8-alpine
+      default: gcr.io/cloud-builders/mvn@sha256:57523fc43394d6d9d2414ee8d1c85ed7a13460cbb268c3cd16d28cfb3859e641 #tag: latest
     - name: GOALS
       description: maven goals to run
       type: array
@@ -78,9 +78,10 @@ spec:
       image: registry.access.redhat.com/ubi8/ubi-minimal:8.2
       script: |
         #!/usr/bin/env bash
-        echo "192.168.100.170 harbor.xwsoftlan.com" >> /etc/hosts
-        echo "192.168.100.137 gitlab.xwsoftlan.com" >> /etc/hosts
-        echo "192.168.100.101 nexus3.xwsoftlan.com" >> /etc/hosts
+        echo "echo null >/workspace/source/src/main/resources/application.yml"
+        echo "" > /workspace/source/src/main/resources/application.yml
+        echo "221.226.175.82 gitlab.xwsoftlan.com" >> /etc/hosts
+        echo "10.0.101.68 nexus3.xwsoftlan.com" >> /etc/hosts
         java -version
         [[ -f $(workspaces.maven-settings.path)/settings.xml ]] && \
         echo 'using existing $(workspaces.maven-settings.path)/settings.xml' && exit 0

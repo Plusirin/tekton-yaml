@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: kaniko
+  name: kaniko-build
   labels:
     app.kubernetes.io/version: "0.5"
   annotations:
@@ -57,10 +57,11 @@ spec:
       #!/busybox/sh
       set -eu
       echo "221.226.175.82 gitlab.xwsoftlan.com" >> /etc/hosts
+      echo "10.166.4.63 core.harbor.xwsoft.cn" >> /etc/hosts
       #echo "10.0.101.68 nexus3.xwsoftlan.com" >> /etc/hosts
       cat /etc/hosts
       #pwd && ls -la && ls -la target
-      sed -i '1c FROM openjdk:8u302-jdk-oracle' Dockerfile
+      #sed -i '1c FROM openjdk:8u302-jdk-oracle' Dockerfile
       /kaniko/executor  --dockerfile=$(params.DOCKERFILE) --context=$(workspaces.source.path)/$(params.CONTEXT) --destination=$(params.IMAGE) --digest-file=/tekton/results/IMAGE-DIGEST --insecure --skip-tls-verify --skip-tls-verify-pull --insecure-pull
     #command:
     #- /busybox/echo "192.168.100.170 harbor.xwsoftlan.com" >> /etc/hosts

@@ -92,7 +92,7 @@ spec:
     - name: gitInitImage
       description: The image providing the git-init binary that this Task runs.
       type: string
-      default: "harbor.xwsoftlan.com/tekton/git-init:v0.28.1"
+      default: "gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.28.1"
     - name: userHome
       description: |
         Absolute path to the user's home directory. Set this explicitly if you are running the image as a non-root user or have overridden
@@ -154,8 +154,8 @@ spec:
         
         git config --global user.name "Zhangyunpeng"
         git config --global user.email "zhangyunpeng@xwsoft.com.cn"
-        echo "192.168.100.170 harbor.xwsoftlan.com" >> /etc/hosts
-        echo "192.168.100.137 gitlab.xwsoftlan.com" >> /etc/hosts
+        #echo "192.168.100.170 harbor.xwsoftlan.com" >> /etc/hosts
+        echo "221.226.175.82 gitlab.xwsoftlan.com" >> /etc/hosts
         
         if [ "${PARAM_VERBOSE}" = "true" ] ; then
           set -x

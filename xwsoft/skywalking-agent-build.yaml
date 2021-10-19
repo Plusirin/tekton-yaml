@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
-  name: pipeline-maven-build-and-push-with-kaniko
+  name: pipeline-skywalking-agent-build-and-push-with-kaniko
 spec:
   description: |
     cat-branch-readme takes a git repository and a branch name and
@@ -25,7 +25,6 @@ spec:
     type: string
     description: image tag.
   workspaces:
-  - name: maven-settings
   - name: dockerconfig
   - name: ssh-creds
   - name: shared-data
@@ -46,29 +45,11 @@ spec:
       value: $(params.repo-url)
     - name: revision
       value: $(params.branch-name)
-  - name: maven-package
-    runAfter: ["git-fetch-repo"]
-    taskRef:
-      name: maven
-    workspaces:
-    - name: source
-      workspace: shared-data
-    - name: maven-settings
-      workspace: maven-settings
-    params:
-    - name: CONTEXT_DIR
-      value: "."
-    - name: GOALS
-      value:
-      - -DskipTests
-      - clean
-      - package
   - name: build-and-push
     runAfter: 
       - git-fetch-repo
-      - maven-package
     taskRef:
-      name: kaniko-maven
+      name: kaniko-build
     workspaces:
     - name: source
       workspace: shared-data
@@ -81,11 +62,11 @@ spec:
 apiVersion: tekton.dev/v1beta1
 kind: PipelineRun
 metadata:
-  name: pipeline-maven-build-and-push-with-kaniko-run
+  name: pipeline-skywalking-agent-build-and-push-with-kaniko-run
 spec:
   serviceAccountName: xwsoftlan-ssh-key-build-bot
   pipelineRef:
-    name: pipeline-maven-build-and-push-with-kaniko
+    name: pipeline-skywalking-agent-build-and-push-with-kaniko
   workspaces:
   - name: ssh-creds
     secret:
@@ -102,16 +83,13 @@ spec:
         resources:
           requests:
             storage: 1Gi
-  - name: maven-settings
-    configMap:
-      name: custom-maven-settings
   params:
   - name: repo-url
-    value: ssh://git@gitlab.xwsoftlan.com:31022/ctg/ec.jakiro.core.git
+    value: ssh://git@gitlab.xwsoftlan.com:31022/Zhangyunpeng/apache-skywalking-apm-es7-8.7.0-owner.git
     #value: ssh://git@gitlab.xwsoftlan.com:31022/Zhangyunpeng/test.git
     #value: ssh://git@gitlab.xwsoftlan.com:31022/xwsoft-opts/gvno-data-go-dashboard.git
     #value: git@github.com:Plusirin/gvno-data-go.git
   - name: branch-name
     value: master
   - name: image
-    value: core.harbor.xwsoft.cn:30267/library/ec.jakiro.core:v0.0.1
+    value: core.harbor.xwsoft.cn:30267/library/apache-skywalking-agent-sidecar:v8.7.0-owner
